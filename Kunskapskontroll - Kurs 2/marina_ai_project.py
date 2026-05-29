@@ -116,21 +116,36 @@ data = pd.DataFrame(rows, columns=[
 ])
 
 # ============================================================
-# STEG 3 - UPPDELNING AV TRÄNINGS- OCH TESTDATA
+# STEG 3 - UPPDELNING AV TRÄNINGS-, VALIDERINGS- OCH TESTDATA
 # ============================================================
 # Datasetet delas upp i:
-# - träningsdata (80%)
-# - testdata (20%)
+# - träningsdata
+# - valideringsdata
+# - testdata
 #
-# Träningsdatan används för att träna modellerna,
-# medan testdatan används för att utvärdera modellernas
-# prestanda på tidigare osedd data.
+# Träningsdatan används för att träna modellerna.
+#
+# Valideringsdatan används för att jämföra modeller
+# och välja den bästa modellen.
+#
+# Testdatan används ENDAST en gång för slutlig
+# utvärdering av den valda modellen.
 
 X = data.drop("occupancy", axis=1)
 y = data["occupancy"]
 
-X_train, X_test, y_train, y_test = train_test_split(
+# Först delas datan upp i:
+# - 80% train/validation
+# - 20% test
+X_temp, X_test, y_temp, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
+)
+
+# Därefter delas train/validation upp i:
+# - 60% train
+# - 20% validation
+X_train, X_val, y_train, y_val = train_test_split(
+    X_temp, y_temp, test_size=0.25, random_state=42
 )
 
 # ============================================================
@@ -176,10 +191,12 @@ def rmse(model, X, y):
 # ============================================================
 # Modellernas prestanda utvärderas på både:
 # - träningsdata
-# - testdata
+# - valideringsdata
 #
-# Stora skillnader mellan tränings- och test-RMSE
-# kan indikera överanpassning.
+# Valideringsdatan används för att jämföra modellerna.
+#
+# Stora skillnader mellan tränings- och
+# validerings-RMSE kan indikera överanpassning.
 
 models = {
     "Linear Regression": linear_model,
@@ -194,18 +211,20 @@ print("\n=== ANALYS AV ÖVERANPASSNING ===")
 for name, model in models.items():
 
     train_rmse = rmse(model, X_train, y_train)
-    test_rmse = rmse(model, X_test, y_test)
+										   
 
-    rmse_results[name] = test_rmse
+    validation_rmse = rmse(model, X_val, y_val)
+
+    rmse_results[name] = validation_rmse
 
     print(f"\n{name}")
     print(f"Train RMSE: {train_rmse:.2f}")
-    print(f"Test RMSE: {test_rmse:.2f}")
+    print(f"Validation RMSE: {validation_rmse:.2f}")
 
 # ============================================================
 # STEG 7 - AUTOMATISKT VAL AV BÄSTA MODELL
 # ============================================================
-# Modellen med lägst test-RMSE väljs automatiskt
+# Modellen med lägst validation-RMSE väljs automatiskt
 # som slutlig prediktionsmodell.
 
 best_model_name = min(rmse_results, key=rmse_results.get)
@@ -219,10 +238,24 @@ else:
 
 print("\n=== VAL AV BÄSTA MODELL ===")
 print(f"Bästa modell: {best_model_name}")
-print(f"Lägsta Test RMSE: {rmse_results[best_model_name]:.2f}")
+print(f"Lägsta Validation RMSE: {rmse_results[best_model_name]:.2f}")
 
 # ============================================================
-# STEG 8 - INTERAKTIV KARTVISUALISERING
+# STEG 8 - SLUTLIG TESTUTVÄRDERING
+# ============================================================
+# Testdatan används nu ENDAST en gång
+# efter att den bästa modellen valts.
+#
+# Detta ger en mer rättvis uppskattning av modellens
+# prestanda på helt osedd data.
+
+final_test_rmse = rmse(best_model, X_test, y_test)
+
+print("\n=== SLUTLIG TESTUTVÄRDERING ===")
+print(f"Final Test RMSE: {final_test_rmse:.2f}")
+
+# ============================================================
+# STEG 9 - INTERAKTIV KARTVISUALISERING
 # ============================================================
 # Folium används för att skapa en interaktiv karta
 # som visar:
@@ -276,7 +309,7 @@ for m in marinas:
     ).add_to(m_map)
 
 # ============================================================
-# STEG 9 - VISUALISERING AV SEGLINGSRUTT
+# STEG 10 - VISUALISERING AV SEGLINGSRUTT
 # ============================================================
 # En fördefinierad seglingsrutt visualiseras mellan
 # olika marinor med hjälp av geografiska koordinater.
@@ -295,7 +328,7 @@ route = [
 folium.PolyLine(route, color="blue", weight=4).add_to(m_map)
 
 # ============================================================
-# STEG 10 - BERÄKNING AV TOTAL DISTANS
+# STEG 11 - BERÄKNING AV TOTAL DISTANS
 # ============================================================
 # Geodesisk distans används för att beräkna den kortaste
 # geografiska distansen mellan koordinater på jordens yta.
@@ -308,7 +341,7 @@ for i in range(len(route)-1):
 print(f"\nTotal seglingsdistans: {total_distance:.1f} km")
 
 # ============================================================
-# STEG 11 - SPARA KARTAN
+# STEG 12 - SPARA KARTAN
 # ============================================================
 # Den interaktiva kartan sparas som en HTML-fil
 # och kan öppnas i valfri webbläsare.
